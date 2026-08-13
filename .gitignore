@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+.uv-cache/
+.env
+.env.*
+!.env.example
+*.log
+dist/
+build/
+*.egg-info/
+
+# PDFs de prueba: traen DNI, RUC, domicilios reales
+samples/

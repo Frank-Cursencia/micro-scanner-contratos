@@ -1,0 +1,19 @@
+services:
+  micro-scanner-contratos:
+    build: .
+    container_name: micro-scanner-contratos
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SERVICE_NAME: micro-scanner-contratos
+      PORT: 4012
+      MICROSERVICE_TOKEN: ${MICROSERVICE_TOKEN:-gateway-secret-token-2024}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "4012:4012"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4012/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
