@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     microservice_token: str | None = Field(default=None, repr=False)
 
     gemini_api_key: str | None = Field(default=None, repr=False)
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-flash-latest"
 
     max_file_size_mb: int = 15
 

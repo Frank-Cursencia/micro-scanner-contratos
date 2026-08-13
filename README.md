@@ -26,7 +26,7 @@ MICROSERVICE_TOKEN=
 
 # Gemini File API + structured output
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-flash-latest
 
 MAX_FILE_SIZE_MB=15
 ```
