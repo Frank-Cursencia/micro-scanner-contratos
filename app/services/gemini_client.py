@@ -1,5 +1,4 @@
 import asyncio
-import io
 from functools import lru_cache
 
 from google import genai
@@ -14,7 +13,7 @@ Reglas estrictas:
 - Si un dato no aparece en el documento, devolvé null. Nunca inventes valores.
 - RUC: exactamente 11 dígitos. Si no cumple, null.
 - DNI: exactamente 8 dígitos. Si no cumple, null.
-- Montos en soles: la coma es separador de miles, no decimal (ej. "1,500.00" es mil quinientos).
+- Montos en soles: la coma en el documento es separador de miles, no decimal (ej. "1,500.00" es mil quinientos). Al devolver el valor, usá SIEMPRE notación decimal simple sin separador de miles (ej. devolvé "4500.00", nunca "4,500.00").
 - Fechas: devolvé en formato dd/mm/yyyy, incluso si en el documento están escritas en letras.
 
 Campos a buscar (clave -> qué significa):
@@ -40,14 +39,17 @@ async def extract_fields(pdf_bytes: bytes, response_model: type[BaseModel], fiel
     prompt = PROMPT_BASE.format(campos=campos_txt)
 
     client = _client()
+    # PDF va inline (bytes) en vez de por Files API — nos ahorramos el
+    # round-trip de upload + espera a que el archivo quede ACTIVE. Files API
+    # se justifica para reusar el mismo archivo en llamadas repetidas; acá
+    # cada PDF se usa una sola vez, así que inline es directamente más rápido.
+    # Límite de Gemini para contenido inline es ~20MB de request (el PDF en
+    # base64 pesa ~4/3 su tamaño real) — MAX_FILE_SIZE_MB ya deja margen.
+    pdf_part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
     async with _semaphore():
-        uploaded = await client.aio.files.upload(
-            file=io.BytesIO(pdf_bytes),
-            config=types.UploadFileConfig(mime_type="application/pdf"),
-        )
         response = await client.aio.models.generate_content(
             model=settings.gemini_model,
-            contents=[uploaded, prompt],
+            contents=[pdf_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=response_model,

@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-flash-latest"
     gemini_max_concurrency: int = 2
 
-    max_file_size_mb: int = 15
+    # PDF va inline (base64) en el request a Gemini, no por Files API — el
+    # límite de Gemini para contenido inline es ~20MB de request, y base64
+    # infla el tamaño real ~4/3. 14MB reales ~= 18.7MB en base64, con margen.
+    max_file_size_mb: int = 14
 
     @field_validator("microservice_token", "gemini_api_key")
     @classmethod
