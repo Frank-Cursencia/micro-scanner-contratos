@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str | None = Field(default=None, repr=False)
     gemini_model: str = "gemini-flash-latest"
+    gemini_max_concurrency: int = 2
 
     max_file_size_mb: int = 15
 

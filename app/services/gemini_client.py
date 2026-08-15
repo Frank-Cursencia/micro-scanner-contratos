@@ -1,4 +1,6 @@
+import asyncio
 import io
+from functools import lru_cache
 
 from google import genai
 from google.genai import types
@@ -25,23 +27,31 @@ def _client() -> genai.Client:
     return genai.Client(api_key=settings.gemini_api_key)
 
 
-def extract_fields(pdf_bytes: bytes, response_model: type[BaseModel], field_descriptions: dict[str, str]) -> BaseModel:
+@lru_cache
+def _semaphore() -> asyncio.Semaphore:
+    # Tope de llamadas simultáneas a Gemini File API — evitar 429/503 propios
+    # al paralelizar extracciones (contrato + carta fianza + SCTR + EPP).
+    return asyncio.Semaphore(get_settings().gemini_max_concurrency)
+
+
+async def extract_fields(pdf_bytes: bytes, response_model: type[BaseModel], field_descriptions: dict[str, str]) -> BaseModel:
     settings = get_settings()
     campos_txt = "\n".join(f"- {key}: {label}" for key, label in field_descriptions.items())
     prompt = PROMPT_BASE.format(campos=campos_txt)
 
     client = _client()
-    uploaded = client.files.upload(
-        file=io.BytesIO(pdf_bytes),
-        config=types.UploadFileConfig(mime_type="application/pdf"),
-    )
-    response = client.models.generate_content(
-        model=settings.gemini_model,
-        contents=[uploaded, prompt],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=response_model,
-            temperature=0.1,
-        ),
-    )
+    async with _semaphore():
+        uploaded = await client.aio.files.upload(
+            file=io.BytesIO(pdf_bytes),
+            config=types.UploadFileConfig(mime_type="application/pdf"),
+        )
+        response = await client.aio.models.generate_content(
+            model=settings.gemini_model,
+            contents=[uploaded, prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=response_model,
+                temperature=0.1,
+            ),
+        )
     return response.parsed

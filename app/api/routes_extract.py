@@ -1,6 +1,8 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from google.genai.errors import ClientError
 
 from app.api.dependencies import require_service_token
 from app.config import get_settings
@@ -9,6 +11,7 @@ from app.services.dynamic_schema import build_dynamic_model
 from app.services.gemini_client import extract_fields
 
 router = APIRouter(tags=["extract"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/api/extract-contrato", dependencies=[Depends(require_service_token)])
@@ -51,5 +54,30 @@ async def extract_contrato(
     response_model = build_dynamic_model(parsed_fields, include_cronograma)
     field_descriptions = {f.key: f.label for f in parsed_fields}
 
-    result = extract_fields(pdf_bytes, response_model, field_descriptions)
+    try:
+        result = await extract_fields(pdf_bytes, response_model, field_descriptions)
+    except ClientError as exc:
+        logger.exception("Fallo llamando a Gemini en /api/extract-contrato")
+        if exc.code == 429:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={"code": "GEMINI_QUOTA_EXCEEDED", "message": "Se agotó la cuota diaria de Gemini. Probá de nuevo más tarde."},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "GEMINI_EXTRACTION_FAILED", "message": "No se pudo analizar el PDF con IA. Intentá de nuevo."},
+        )
+    except Exception:
+        logger.exception("Fallo llamando a Gemini en /api/extract-contrato")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "GEMINI_EXTRACTION_FAILED", "message": "No se pudo analizar el PDF con IA. Intentá de nuevo."},
+        )
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "GEMINI_EMPTY_RESPONSE", "message": "Gemini no devolvió datos para este PDF."},
+        )
+
     return result.model_dump()
