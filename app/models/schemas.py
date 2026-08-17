@@ -15,3 +15,13 @@ class PagoExtraido(BaseModel):
     nombre: str | None = None
     monto: str | None = None
     condicion: str | None = None
+
+
+class ItemExtraido(BaseModel):
+    """Un servicio/ítem pedido en el documento (ej. tabla "Descripción del
+    servicio a contratar" de un TDR). Espeja Item en
+    GestionOrdenServicio.tsx — sin tipoServicio: mapear ese campo al
+    catálogo interno queda a criterio de quien revisa, la IA no lo intenta."""
+
+    descripcion: str | None = None
+    cantidad: str | None = None

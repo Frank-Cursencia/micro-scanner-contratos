@@ -19,6 +19,7 @@ async def extract_contrato(
     file: UploadFile = File(...),
     fields: str = Form(..., description='JSON: [{"key": "...", "label": "..."}]'),
     include_cronograma: bool = Form(False),
+    include_items: bool = Form(False),
 ) -> dict:
     settings = get_settings()
 
@@ -51,7 +52,7 @@ async def extract_contrato(
             detail={"code": "GEMINI_API_KEY_NOT_CONFIGURED", "message": "GEMINI_API_KEY no está configurado."},
         )
 
-    response_model = build_dynamic_model(parsed_fields, include_cronograma)
+    response_model = build_dynamic_model(parsed_fields, include_cronograma, include_items)
     field_descriptions = {f.key: f.label for f in parsed_fields}
 
     try:
