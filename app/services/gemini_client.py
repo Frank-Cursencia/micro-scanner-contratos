@@ -1,11 +1,23 @@
 import asyncio
+import logging
 from functools import lru_cache
 
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
 from pydantic import BaseModel
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+# Gemini devuelve 503 "high demand" de forma transitoria — confirmado en
+# staging incluso después de los reintentos internos del SDK (visible en el
+# stack trace: tenacity ya reintentó y aun así llegó ServerError). Un
+# reintento propio, espaciado, evita que el usuario tenga que volver a subir
+# el PDF a mano cada vez que el modelo está saturado.
+MAX_INTENTOS_503 = 3
+ESPERA_ENTRE_INTENTOS_S = 5
 
 PROMPT_BASE = """Sos un extractor de datos de contratos peruanos. Se te adjunta un PDF.
 
@@ -47,13 +59,24 @@ async def extract_fields(pdf_bytes: bytes, response_model: type[BaseModel], fiel
     # base64 pesa ~4/3 su tamaño real) — MAX_FILE_SIZE_MB ya deja margen.
     pdf_part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
     async with _semaphore():
-        response = await client.aio.models.generate_content(
-            model=settings.gemini_model,
-            contents=[pdf_part, prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=response_model,
-                temperature=0.1,
-            ),
-        )
+        for intento in range(1, MAX_INTENTOS_503 + 1):
+            try:
+                response = await client.aio.models.generate_content(
+                    model=settings.gemini_model,
+                    contents=[pdf_part, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=response_model,
+                        temperature=0.1,
+                    ),
+                )
+                break
+            except ServerError as exc:
+                if exc.code != 503 or intento == MAX_INTENTOS_503:
+                    raise
+                logger.warning(
+                    "Gemini 503 (alta demanda), reintento %d/%d en %ds",
+                    intento, MAX_INTENTOS_503 - 1, ESPERA_ENTRE_INTENTOS_S,
+                )
+                await asyncio.sleep(ESPERA_ENTRE_INTENTOS_S)
     return response.parsed
