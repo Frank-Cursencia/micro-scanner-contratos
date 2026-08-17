@@ -10,8 +10,9 @@ en el monorepo (Bloque 1: F1-F4, campos dinámicos).
 
 ## Variables de entorno
 
-No hay `.env.example` (bloqueado por permisos del entorno de desarrollo). Copiar
-esta lista a un `.env` local:
+El repositorio incluye `.env.example`. En el primer arranque con PowerShell,
+`dev.ps1` lo copia automaticamente a `.env` cuando este archivo todavia no
+existe. Luego se deben configurar los valores privados localmente:
 
 ```
 SERVICE_NAME=micro-scanner-contratos
@@ -28,10 +29,22 @@ MICROSERVICE_TOKEN=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-flash-latest
 
-MAX_FILE_SIZE_MB=15
+MAX_FILE_SIZE_MB=14
 ```
 
 ## Correr local
+
+### Windows PowerShell
+
+```powershell
+.\dev.ps1
+```
+
+El script carga `.env`, crea `.venv` si falta, instala `requirements.txt`
+solamente cuando no encuentra las dependencias esenciales y levanta Uvicorn en
+`http://127.0.0.1:4012` con recarga automatica.
+
+### Linux/macOS
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
