@@ -22,10 +22,28 @@ ESPERA_ENTRE_INTENTOS_S = 5
 PROMPT_BASE = """Sos un extractor de datos de contratos peruanos. Se te adjunta un PDF.
 
 Reglas estrictas:
+- Revisá el documento completo, incluidas todas sus páginas, anexos, cuadros,
+  encabezados y cláusulas. No te detengas en la primera página.
 - Si un dato no aparece en el documento, devolvé null. Nunca inventes valores.
+- Para ubicación del proyecto, distinguí cuidadosamente entre: (1) lugar donde
+  se ejecuta el servicio o está el predio/proyecto, (2) domicilio legal del
+  cliente, (3) domicilio del proveedor, (4) ciudad de firma y (5) lugares de
+  notificación. Solo (1) sirve como ubicación/ciudad del proyecto.
+- Buscá el lugar de ejecución también en antecedentes, objeto, alcance,
+  descripción del predio, coordenadas, tablas y anexos. Si aparece distrito,
+  provincia o departamento explícitamente vinculado al proyecto, podés usar
+  esa jerarquía para completar el campo ciudad. No deduzcas una ciudad desde
+  el nombre de una empresa ni desde su domicilio fiscal.
 - RUC: exactamente 11 dígitos. Si no cumple, null.
 - DNI: exactamente 8 dígitos. Si no cumple, null.
 - Montos en soles: la coma en el documento es separador de miles, no decimal (ej. "1,500.00" es mil quinientos). Al devolver el valor, usá SIEMPRE notación decimal simple sin separador de miles (ej. devolvé "4500.00", nunca "4,500.00").
+- Si se solicita precio/monto total, tomá únicamente el TOTAL FINAL del
+  contrato. Nunca uses como precio un RUC, año, subtotal, IGV, porcentaje,
+  carta fianza o penalidad. Verificá que sea coherente con la suma del
+  cronograma de pagos cuando el documento contiene ambos datos.
+- En cronograma_pagos.monto devolvé el IMPORTE MONETARIO de cada cuota, no el
+  porcentaje. Si el documento solo da porcentajes, calculá cada importe usando
+  el total final del contrato.
 - Fechas: devolvé en formato dd/mm/yyyy, incluso si en el documento están escritas en letras.
 
 Campos a buscar (clave -> qué significa):

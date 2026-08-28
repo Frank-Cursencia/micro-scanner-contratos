@@ -35,6 +35,15 @@ class _CamposDummy(BaseModel):
     nombre: str | None = None
 
 
+def test_prompt_distingue_lugar_de_ejecucion_de_domicilios_legales():
+    prompt = gemini_client.PROMPT_BASE
+
+    assert "documento completo" in prompt
+    assert "lugar donde\n  se ejecuta el servicio" in prompt
+    assert "domicilio legal del\n  cliente" in prompt
+    assert "No deduzcas una ciudad" in prompt
+
+
 def _server_error_503() -> ServerError:
     return ServerError(503, {"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}})
 
