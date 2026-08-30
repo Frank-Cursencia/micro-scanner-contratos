@@ -1,4 +1,4 @@
-from app.models.schemas import FieldSpec
+from app.models.schemas import FieldSpec, PagoExtraido
 from app.services.dynamic_schema import build_dynamic_model
 
 
@@ -21,6 +21,9 @@ def test_build_dynamic_model_adds_cronograma_when_requested():
 
     instance = model(ruc="1", cronograma_pagos=[{"nombre": "Primer pago", "monto": "S/. 500", "condicion": "a la firma"}])
     assert instance.cronograma_pagos[0].nombre == "Primer pago"
+    assert "nunca el porcentaje" in PagoExtraido.model_fields["monto"].description
+    assert "tal como aparece" in PagoExtraido.model_fields["nombre"].description
+    assert "conservando la redaccion" in PagoExtraido.model_fields["condicion"].description
 
 
 def test_build_dynamic_model_without_cronograma_omits_field():
