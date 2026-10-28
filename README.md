@@ -58,6 +58,13 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
   - multipart: `file` (PDF), `fields` (JSON `[{"key","label"}, ...]`), `include_cronograma` (bool)
   - devuelve `{clave: valor|null, ...}` — solo las claves pedidas
 
+El mismo endpoint sirve contratos internos, contratos externos y órdenes de
+servicio. Cada formulario mantiene su lista de `fields`; no se impone un perfil
+único. `include_items` conserva los ítems de las órdenes. Las cuotas mantienen
+`nombre`, `monto` y `condicion`, y admiten opcionalmente `fecha`, `hitoActivador`
+y `porcentaje` cuando constan en el PDF. No se generan fechas ni se convierten
+monedas. Los datos ausentes siguen siendo `null` para revisión manual.
+
 ## Test
 
 ```bash

@@ -36,6 +36,30 @@ class PagoExtraido(BaseModel):
             "sin resumir ni agregar requisitos inexistentes."
         ),
     )
+    fecha: str | None = Field(
+        default=None,
+        description=(
+            "Fecha de vencimiento de ESTA cuota, solo si figura expresamente. "
+            "No usar la fecha de firma ni calcular una fecha desde un plazo o "
+            "hito sin fecha. Devolver dd/mm/yyyy; si no consta, null."
+        ),
+    )
+    hitoActivador: str | None = Field(
+        default=None,
+        description=(
+            "Nombre literal del entregable o hito al que esta cuota esta "
+            "vinculada expresamente. No inventar hitos ni copiar todo el "
+            "objeto del contrato. Si no consta, null."
+        ),
+    )
+    porcentaje: str | None = Field(
+        default=None,
+        description=(
+            "Porcentaje de esta cuota solo si esta expresamente indicado, "
+            "numero entre 0 y 100 sin signo %. No sustituye al monto "
+            "monetario ni se calcula cuando no aparece."
+        ),
+    )
 
 
 class ItemExtraido(BaseModel):

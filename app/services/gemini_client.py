@@ -36,7 +36,10 @@ Reglas estrictas:
   el nombre de una empresa ni desde su domicilio fiscal.
 - RUC: exactamente 11 dígitos. Si no cumple, null.
 - DNI: exactamente 8 dígitos. Si no cumple, null.
-- Montos en soles: la coma en el documento es separador de miles, no decimal (ej. "1,500.00" es mil quinientos). Al devolver el valor, usá SIEMPRE notación decimal simple sin separador de miles (ej. devolvé "4500.00", nunca "4,500.00").
+- Montos: conservá la moneda original del documento; no asumas soles ni
+  conviertas dólares a soles. La coma de miles (ej. "1,500.00") no es decimal.
+  Devolvé SIEMPRE notación decimal simple sin separador de miles (ej. "4500.00",
+  nunca "4,500.00"). Si se pide moneda y no está expresada, devolvé null.
 - Si se solicita precio/monto total, tomá únicamente el TOTAL FINAL del
   contrato. Nunca uses como precio un RUC, año, subtotal, IGV, porcentaje,
   carta fianza o penalidad. Verificá que sea coherente con la suma del

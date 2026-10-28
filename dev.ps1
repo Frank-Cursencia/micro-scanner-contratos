@@ -67,7 +67,7 @@ if (-not (Test-Path -LiteralPath $python)) {
 }
 
 # Instalar requirements solamente cuando falten modulos esenciales.
-& $python -c "import fastapi, uvicorn, pydantic, pydantic_settings, google.genai, multipart" 2>$null
+& $python -c "import fastapi, uvicorn, pydantic, pydantic_settings, google.genai, multipart, pypdf" 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Faltan dependencias en .venv. Instalando requirements.txt..." -ForegroundColor Yellow
     & $python -m pip install --disable-pip-version-check --no-input -r (Join-Path $PSScriptRoot "requirements.txt")
