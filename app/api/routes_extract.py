@@ -1,4 +1,5 @@
 import json
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -10,6 +11,7 @@ from app.models.schemas import FieldSpec
 from app.services.dynamic_schema import build_dynamic_model
 from app.services.gemini_client import extract_fields
 from app.services.pdf_text_values import extract_textual_total
+from app.services.numero_contrato import normalizar_numero_contrato
 
 router = APIRouter(tags=["extract"])
 logger = logging.getLogger(__name__)
@@ -127,6 +129,7 @@ async def extract_contrato(
     fields: str = Form(..., description='JSON: [{"key": "...", "label": "..."}]'),
     include_cronograma: bool = Form(False),
     include_items: bool = Form(False),
+    include_gastos_tupa: bool = Form(False),
 ) -> dict:
     settings = get_settings()
 
@@ -150,7 +153,9 @@ async def extract_contrato(
             detail='"fields" debe ser JSON: [{"key": "...", "label": "..."}]',
         ) from exc
 
-    if not parsed_fields:
+    if any(f.key == "gastos_tupa" for f in parsed_fields):
+        raise HTTPException(status_code=400, detail='Usar include_gastos_tupa, no un campo escalar gastos_tupa.')
+    if not parsed_fields and not include_gastos_tupa:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='"fields" no puede estar vacío.')
 
     if settings.gemini_api_key is None:
@@ -159,11 +164,17 @@ async def extract_contrato(
             detail={"code": "GEMINI_API_KEY_NOT_CONFIGURED", "message": "GEMINI_API_KEY no está configurado."},
         )
 
-    response_model = build_dynamic_model(parsed_fields, include_cronograma, include_items)
+    response_model = build_dynamic_model(parsed_fields, include_cronograma, include_items, include_gastos_tupa)
     field_descriptions = {f.key: f.label for f in parsed_fields}
 
     try:
-        result = await extract_fields(pdf_bytes, response_model, field_descriptions)
+        if include_gastos_tupa:
+            # Plazo total incluye espera del semáforo. No relanzar el proveedor.
+            result = await asyncio.wait_for(extract_fields(pdf_bytes, response_model, field_descriptions), timeout=45)
+        else:
+            result = await extract_fields(pdf_bytes, response_model, field_descriptions)
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail={"code": "TUPA_TIMEOUT", "message": "La lectura excedió su plazo."})
     except ClientError as exc:
         logger.exception("Fallo llamando a Gemini en /api/extract-contrato")
         if exc.code == 429:
@@ -188,9 +199,10 @@ async def extract_contrato(
             detail={"code": "GEMINI_EMPTY_RESPONSE", "message": "Gemini no devolvió datos para este PDF."},
         )
 
-    data = await enrich_missing_location(pdf_bytes, parsed_fields, result)
+    # Las lecturas TUPA son una intención explícita de un pase, sin enriquecimiento IA.
+    data = result.model_dump() if include_gastos_tupa else await enrich_missing_location(pdf_bytes, parsed_fields, result)
     if any(field.key == "precioTotal" for field in parsed_fields):
         textual_total = extract_textual_total(pdf_bytes, _schedule_monetary_total(data))
         if textual_total is not None:
             data["precioTotal"] = textual_total
-    return data
+    return normalizar_numero_contrato(data)

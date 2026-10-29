@@ -1,10 +1,12 @@
 from pydantic import BaseModel, Field, create_model
 
 from app.models.schemas import FieldSpec, ItemExtraido, PagoExtraido
+from app.models.gastos_tupa import GastoTupaExtraido
 
 
 def build_dynamic_model(
-    fields: list[FieldSpec], include_cronograma: bool, include_items: bool = False
+    fields: list[FieldSpec], include_cronograma: bool, include_items: bool = False,
+    include_gastos_tupa: bool = False,
 ) -> type[BaseModel]:
     """Arma el modelo de respuesta de Gemini en runtime, a partir de los
     campos que pide el frontend. El backend no conoce de antemano qué
@@ -22,5 +24,10 @@ def build_dynamic_model(
         attrs["items"] = (
             list[ItemExtraido] | None,
             Field(default=None, description="Servicios/ítems pedidos en el documento, con su descripción y cantidad"),
+        )
+    if include_gastos_tupa:
+        attrs["gastos_tupa"] = (
+            list[GastoTupaExtraido],
+            Field(default_factory=list, max_length=50, description="Propuestas TUPA literales, nunca gastos aprobados"),
         )
     return create_model("CamposExtraidos", **attrs)

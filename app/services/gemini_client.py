@@ -8,6 +8,7 @@ from google.genai.errors import ServerError
 from pydantic import BaseModel
 
 from app.config import get_settings
+from app.models.gastos_tupa import PROMPT_TUPA
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,12 @@ Reglas estrictas:
   el nombre de una empresa ni desde su domicilio fiscal.
 - RUC: exactamente 11 dígitos. Si no cumple, null.
 - DNI: exactamente 8 dígitos. Si no cumple, null.
+- Si se solicita numeroDocumentoOriginal, leé el encabezado completo del
+  contrato: no omitas CONTRATO ni el servicio que precede al correlativo.
+  Conservá ceros iniciales y año. Si también se pide tipoServicio, obtenelo
+  del objeto y alcance del mismo contrato, no de una cuota o anexo. Para
+  varios servicios diferentes devolvé null, no elijas el primero. Nunca
+  inventes correlativo, año ni servicio para completar el identificador.
 - Montos: conservá la moneda original del documento; no asumas soles ni
   conviertas dólares a soles. La coma de miles (ej. "1,500.00") no es decimal.
   Devolvé SIEMPRE notación decimal simple sin separador de miles (ej. "4500.00",
@@ -54,8 +61,12 @@ Campos a buscar (clave -> qué significa):
 """
 
 
-def _client() -> genai.Client:
+def _client(*, single_attempt: bool = False) -> genai.Client:
     settings = get_settings()
+    if single_attempt:
+        return genai.Client(api_key=settings.gemini_api_key, http_options=types.HttpOptions(
+            timeout=35000, retry_options=types.HttpRetryOptions(attempts=1),
+        ))
     return genai.Client(api_key=settings.gemini_api_key)
 
 
@@ -70,8 +81,10 @@ async def extract_fields(pdf_bytes: bytes, response_model: type[BaseModel], fiel
     settings = get_settings()
     campos_txt = "\n".join(f"- {key}: {label}" for key, label in field_descriptions.items())
     prompt = PROMPT_BASE.format(campos=campos_txt)
-
-    client = _client()
+    tupa = "gastos_tupa" in response_model.model_fields
+    if tupa:
+        prompt += PROMPT_TUPA
+    client = _client(single_attempt=True) if tupa else _client()
     # PDF va inline (bytes) en vez de por Files API — nos ahorramos el
     # round-trip de upload + espera a que el archivo quede ACTIVE. Files API
     # se justifica para reusar el mismo archivo en llamadas repetidas; acá
@@ -80,7 +93,8 @@ async def extract_fields(pdf_bytes: bytes, response_model: type[BaseModel], fiel
     # base64 pesa ~4/3 su tamaño real) — MAX_FILE_SIZE_MB ya deja margen.
     pdf_part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
     async with _semaphore():
-        for intento in range(1, MAX_INTENTOS_503 + 1):
+        max_intentos = 1 if tupa else MAX_INTENTOS_503
+        for intento in range(1, max_intentos + 1):
             try:
                 response = await client.aio.models.generate_content(
                     model=settings.gemini_model,
@@ -93,7 +107,7 @@ async def extract_fields(pdf_bytes: bytes, response_model: type[BaseModel], fiel
                 )
                 break
             except ServerError as exc:
-                if exc.code != 503 or intento == MAX_INTENTOS_503:
+                if exc.code != 503 or intento == max_intentos:
                     raise
                 logger.warning(
                     "Gemini 503 (alta demanda), reintento %d/%d en %ds",
